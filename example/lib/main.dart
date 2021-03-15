@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:io' as io;
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:file/file.dart';
 import 'package:file/local.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_audio_recorder/flutter_audio_recorder.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIOverlays([]);
   return runApp(new MyApp());
 }
@@ -43,13 +44,12 @@ class RecorderExample extends StatefulWidget {
 }
 
 class RecorderExampleState extends State<RecorderExample> {
-  FlutterAudioRecorder _recorder;
-  Recording _current;
+  FlutterAudioRecorder? _recorder;
+  Recording? _current;
   RecordingStatus _currentStatus = RecordingStatus.Unset;
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     _init();
   }
@@ -67,7 +67,7 @@ class RecorderExampleState extends State<RecorderExample> {
                 children: <Widget>[
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: new FlatButton(
+                    child: new TextButton(
                       onPressed: () {
                         switch (_currentStatus) {
                           case RecordingStatus.Initialized:
@@ -95,34 +95,34 @@ class RecorderExampleState extends State<RecorderExample> {
                         }
                       },
                       child: _buildText(_currentStatus),
-                      color: Colors.lightBlue,
+                      // color: Colors.lightBlue,
                     ),
                   ),
-                  new FlatButton(
+                  new TextButton(
                     onPressed:
                         _currentStatus != RecordingStatus.Unset ? _stop : null,
                     child:
                         new Text("Stop", style: TextStyle(color: Colors.white)),
-                    color: Colors.blueAccent.withOpacity(0.5),
+                    // color: Colors.blueAccent.withOpacity(0.5),
                   ),
                   SizedBox(
                     width: 8,
                   ),
-                  new FlatButton(
+                  new TextButton(
                     onPressed: onPlayAudio,
                     child:
                         new Text("Play", style: TextStyle(color: Colors.white)),
-                    color: Colors.blueAccent.withOpacity(0.5),
+                    // color: Colors.blueAccent.withOpacity(0.5),
                   ),
                 ],
               ),
               new Text("Status : $_currentStatus"),
-              new Text('Avg Power: ${_current?.metering?.averagePower}'),
-              new Text('Peak Power: ${_current?.metering?.peakPower}'),
+              new Text('Avg Power: ${_current?.metering.averagePower}'),
+              new Text('Peak Power: ${_current?.metering.peakPower}'),
               new Text("File path of the record: ${_current?.path}"),
               new Text("Format: ${_current?.audioFormat}"),
               new Text(
-                  "isMeteringEnabled: ${_current?.metering?.isMeteringEnabled}"),
+                  "isMeteringEnabled: ${_current?.metering.isMeteringEnabled}"),
               new Text("Extension : ${_current?.extension}"),
               new Text(
                   "Audio recording duration : ${_current?.duration.toString()}")
@@ -140,7 +140,7 @@ class RecorderExampleState extends State<RecorderExample> {
         if (io.Platform.isIOS) {
           appDocDirectory = await getApplicationDocumentsDirectory();
         } else {
-          appDocDirectory = await getExternalStorageDirectory();
+          appDocDirectory = (await getExternalStorageDirectory())!;
         }
 
         // can add extension like ".mp4" ".wav" ".m4a" ".aac"
@@ -152,11 +152,11 @@ class RecorderExampleState extends State<RecorderExample> {
         // .mp4 .m4a .aac <---> AudioFormat.AAC
         // AudioFormat is optional, if given value, will overwrite path extension when there is conflicts.
         _recorder =
-            FlutterAudioRecorder(customPath, audioFormat: AudioFormat.WAV);
+            FlutterAudioRecorder(customPath, audioFormat: AudioFormat.AAC);
 
-        await _recorder.initialized;
+        await _recorder!.initialized;
         // after initialization
-        var current = await _recorder.current(channel: 0);
+        var current = await _recorder!.current(channel: 0);
         print(current);
         // should be "Initialized", if all working fine
         setState(() {
@@ -165,7 +165,7 @@ class RecorderExampleState extends State<RecorderExample> {
           print(_currentStatus);
         });
       } else {
-        Scaffold.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
             new SnackBar(content: new Text("You must accept permissions")));
       }
     } catch (e) {
@@ -175,8 +175,8 @@ class RecorderExampleState extends State<RecorderExample> {
 
   _start() async {
     try {
-      await _recorder.start();
-      var recording = await _recorder.current(channel: 0);
+      await _recorder!.start();
+      var recording = await _recorder!.current(channel: 0);
       setState(() {
         _current = recording;
       });
@@ -187,11 +187,11 @@ class RecorderExampleState extends State<RecorderExample> {
           t.cancel();
         }
 
-        var current = await _recorder.current(channel: 0);
+        var current = await _recorder!.current(channel: 0);
         // print(current.status);
         setState(() {
           _current = current;
-          _currentStatus = _current.status;
+          _currentStatus = _current!.status;
         });
       });
     } catch (e) {
@@ -200,24 +200,24 @@ class RecorderExampleState extends State<RecorderExample> {
   }
 
   _resume() async {
-    await _recorder.resume();
+    await _recorder!.resume();
     setState(() {});
   }
 
   _pause() async {
-    await _recorder.pause();
+    await _recorder!.pause();
     setState(() {});
   }
 
   _stop() async {
-    var result = await _recorder.stop();
-    print("Stop recording: ${result.path}");
+    var result = await _recorder!.stop();
+    print("Stop recording: ${result!.path}");
     print("Stop recording: ${result.duration}");
     File file = widget.localFileSystem.file(result.path);
     print("File length: ${await file.length()}");
     setState(() {
       _current = result;
-      _currentStatus = _current.status;
+      _currentStatus = _current!.status;
     });
   }
 
@@ -251,7 +251,8 @@ class RecorderExampleState extends State<RecorderExample> {
   }
 
   void onPlayAudio() async {
-    AudioPlayer audioPlayer = AudioPlayer();
-    await audioPlayer.play(_current.path, isLocal: true);
+    AudioPlayer player = AudioPlayer();
+    await player.setFilePath(_current!.path.toString());
+    await player.play();
   }
 }
